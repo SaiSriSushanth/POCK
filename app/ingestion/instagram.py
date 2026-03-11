@@ -2,12 +2,13 @@ import os
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..core.classification_engine import process_normalized_message
-from ..utils.normalization import NormalizedMessage
+from ..models import Business
+from ..workers.classification_task import classify_message_task
 
 router = APIRouter(prefix="/meta/instagram", tags=["Instagram"])
 
-VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN") # Usually the same for the whole Meta App
+VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN")
+
 
 @router.get("/webhook", include_in_schema=False)
 async def verify_instagram(
@@ -20,34 +21,43 @@ async def verify_instagram(
             return int(challenge)
     raise HTTPException(status_code=403, detail="Verification failed")
 
+
 @router.post("/webhook")
 async def handle_instagram(request: Request, db: Session = Depends(get_db)):
     body = await request.json()
-    
-    # Debug: Print the object type reaching the server
     obj_type = body.get("object")
-    
-    # Instagram DMs can come as 'instagram' or 'page' objects depending on subscription
+
     if obj_type in ["instagram", "page"]:
         for entry in body.get("entry", []):
-            # Instagram DMs use 'messaging' field
+            # Resolve business by Instagram account ID or page ID
+            entry_id = entry.get("id")
+            business = None
+            if entry_id:
+                business = (
+                    db.query(Business)
+                    .filter(
+                        (Business.instagram_account_id == entry_id) |
+                        (Business.page_id == entry_id)
+                    )
+                    .first()
+                )
+
             if "messaging" in entry:
                 for messaging_event in entry.get("messaging", []):
                     if "message" in messaging_event:
                         message = messaging_event["message"]
                         sender_id = messaging_event.get("sender", {}).get("id")
-                        
+
                         if not message.get("is_echo"):
                             text = message.get("text")
                             if text:
-                                norm_msg = NormalizedMessage(
+                                classify_message_task.delay(
                                     source="instagram",
-                                    sender_id=sender_id,
-                                    text=text
+                                    sender_id=sender_id or "",
+                                    text=text,
+                                    business_id=str(business.id) if business else None,
                                 )
-                                process_normalized_message(db, norm_msg)
-        
+
         return {"status": "success"}
-    
-    print(f"Ignored Instagram webhook object: {obj_type}")
+
     return {"status": "ignored"}
