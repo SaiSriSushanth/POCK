@@ -13,3 +13,7 @@ node_modules/
 frontend/.next/
 frontend/node_modules/
 celerybeat-schedule
+
+# Docs — only ONBOARDING_DOCS.md is tracked
+*.md
+!ONBOARDING_DOCS.md
