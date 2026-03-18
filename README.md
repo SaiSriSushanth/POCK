@@ -59,10 +59,6 @@ Copy the **Forwarding URL** (e.g. `https://abc123.ngrok-free.app`). You'll use t
 
 ## 4. Configure environment variables
 
-```bash
-cp .env.example .env
-```
-
 Edit `.env` and fill in every value:
 
 ```env
@@ -73,23 +69,17 @@ WHATSAPP_VERIFY_TOKEN=mysecrettoken   # must match what you set in Meta webhook 
 
 REDIS_URL=redis://localhost:6379/0
 
-# Generate with the command below
+# Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ENCRYPTION_KEY=
 
 JWT_SECRET_KEY=any-long-random-string
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=10080
 
 META_APP_ID=your_meta_app_id
 META_APP_SECRET=your_meta_app_secret
 META_OAUTH_REDIRECT_URI=https://<your-ngrok>/businesses/oauth/facebook/callback
 
-FRONTEND_URL=http://localhost:3000
-```
-
-**Generate ENCRYPTION_KEY:**
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Optional — set to activate Sentry error monitoring
+SENTRY_DSN=
 ```
 
 > Note: Every time you restart ngrok you get a new URL. Update `META_OAUTH_REDIRECT_URI` in `.env` and in the Meta app's **Valid OAuth Redirect URIs** (Facebook Login → Settings) whenever this changes.
@@ -99,7 +89,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 ## 5. Start the backend
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 This starts:
@@ -107,9 +97,9 @@ This starts:
 - `redis` — message broker for Celery
 - `api` — FastAPI on port 8000
 - `worker` — Celery worker for async classification
-- `beat` — Celery beat scheduler
+- `beat` — Celery beat scheduler (daily briefing, token refresh)
 
-Verify it's running: http://localhost:8000
+Verify it's running: http://localhost:8000/health
 
 ---
 
@@ -129,14 +119,14 @@ Open http://localhost:3000
 
 1. Go to http://localhost:3000 — you'll be taken to the login page
 2. Click **Register** and create your account
-3. After registering, click **Connect Facebook** and complete the OAuth flow
+3. After registering, click **Reconnect Facebook** in the sidebar and complete the OAuth flow
 4. You'll be redirected back to the inbox with your channels connected
 
 ---
 
 ## 8. Test it
 
-Send a WhatsApp message from your test number to the connected number. Within a few seconds you should see the conversation appear in the inbox, classified with an AI label and a draft reply ready to send.
+Send a WhatsApp message from your test number to the connected number. Within a few seconds the conversation appears in the inbox, classified with an AI label and a draft reply ready to send.
 
 ---
 
@@ -145,25 +135,26 @@ Send a WhatsApp message from your test number to the connected number. Within a 
 ```
 POCK/
 ├── app/
-│   ├── api/              # REST endpoints (auth, conversations, contacts, analytics, labels)
+│   ├── api/              # REST endpoints (auth, conversations, contacts, analytics, team, roles, automation, search)
 │   ├── core/             # Classification engine, LLM service, vector search
 │   ├── ingestion/        # Webhook handlers (WhatsApp, Messenger, Instagram, Slack)
 │   ├── models.py         # SQLAlchemy models
 │   ├── services/         # OAuth, token encryption, reply sending, draft generation
-│   └── workers/          # Celery tasks
+│   └── workers/          # Celery tasks (classification, briefing, token refresh)
 ├── frontend/
-│   ├── pages/            # Next.js pages (inbox, conversation, contacts, analytics)
+│   ├── components/       # Shared Layout component
+│   ├── pages/            # Next.js pages (inbox, conversation, contacts, analytics, settings, search)
 │   └── lib/api.js        # API client
 ├── docker-compose.yml
 ├── Dockerfile
-└── .env.example
+└── .env
 ```
 
 ---
 
 ## How Classification Works
 
-1. Incoming message hits `/meta/webhook`
+1. Incoming message hits the webhook
 2. Celery task is dispatched asynchronously
 3. Message is embedded using OpenAI `text-embedding-3-small`
 4. Vector similarity search finds the closest labels in the DB
@@ -171,12 +162,13 @@ POCK/
 6. Final confidence = 40% vector score + 60% LLM confidence
 7. If confidence < 0.5, label is flagged as "Needs Review"
 8. A draft reply is generated using GPT-4o-mini with conversation history
+9. Automation rules fire (e.g. assign to role, set priority/status)
 
 ---
 
 ## Default AI Labels
 
-These are seeded automatically on first startup:
+Seeded automatically on first startup. You can add custom labels from the dashboard.
 
 | Label | Description |
 |---|---|
@@ -185,7 +177,28 @@ These are seeded automatically on first startup:
 | Refund | Customer requesting a refund or cancellation |
 | Spam | Irrelevant content or promotional messages |
 
-You can add custom labels from the dashboard.
+---
+
+## Features
+
+- **Inbox** — shared multi-channel inbox with open/pending/resolved filters and live updates
+- **Conversations** — full message thread, send replies, internal notes, AI draft replies
+- **Contacts** — searchable contact list with message history and inline editing
+- **Analytics** — messages per day, label distribution, channel breakdown
+- **Search** — semantic vector search across all messages
+- **Team** — invite members, assign custom roles
+- **Automation** — trigger rules on AI label (assign to role, set priority, set status)
+- **Settings** — manage team, roles, and automation rules in one place
+
+---
+
+## Reliability
+
+- `GET /health` — health check endpoint (checks DB connectivity)
+- Rate limiting on login (20/min) and register (10/hr) per IP
+- Structured logging across API and workers
+- Sentry error monitoring (set `SENTRY_DSN` in `.env` to enable)
+- Celery beat for daily briefings and Meta token auto-refresh
 
 ---
 
@@ -193,10 +206,10 @@ You can add custom labels from the dashboard.
 
 **Messages not appearing in inbox**
 - Check that ngrok is running and the webhook URL in Meta matches your current ngrok URL
-- Run `docker-compose logs worker` to see if classification is failing
+- Run `docker compose logs worker` to see if classification is failing
 
 **"No business_id" warning in worker logs**
-- Your business isn't connected yet — click Reconnect Facebook in the sidebar
+- Your business isn't connected yet — click **Reconnect Facebook** in the sidebar
 
 **WhatsApp connected but can't send replies**
 - Reconnect Facebook to fetch the Phone Number ID (required for outbound messages)
@@ -207,4 +220,4 @@ You can add custom labels from the dashboard.
 **ngrok URL changed**
 - Update `META_OAUTH_REDIRECT_URI` in `.env`
 - Update the webhook URL in Meta Developer Console
-- Restart the API: `docker-compose restart api`
+- Restart the API: `docker compose restart api`
