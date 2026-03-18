@@ -128,6 +128,24 @@ export default function InboxPage() {
               >
                 Analytics
               </button>
+              <button
+                onClick={() => router.push("/search")}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
+              >
+                Search
+              </button>
+              <button
+                onClick={() => router.push("/settings")}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
+              >
+                Settings
+              </button>
+              <button
+                onClick={() => router.push("/automation")}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
+              >
+                Automation
+              </button>
             </div>
           </nav>
           <button

@@ -9,6 +9,7 @@ import {
   sendReply,
   addNote,
   getNotes,
+  getTeam,
   logout,
 } from "../../lib/api";
 
@@ -102,6 +103,9 @@ export default function ConversationPage() {
     queryFn: () => getNotes(id),
     enabled: !!id,
   });
+
+  // Load team members for assignment
+  const { data: team } = useQuery({ queryKey: ["team"], queryFn: getTeam, enabled: !!id });
 
   // Mutations
   const updateMutation = useMutation({
@@ -372,6 +376,21 @@ export default function ConversationPage() {
           ) : (
             <p className="text-xs text-gray-400">No contact linked</p>
           )}
+
+          {/* Assignment */}
+          <div className="mt-4 pt-4 border-t space-y-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Assigned To</p>
+            <select
+              value={conversation?.assigned_to || ""}
+              onChange={(e) => updateMutation.mutate({ assigned_to: e.target.value || null })}
+              className="w-full text-xs border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            >
+              <option value="">Unassigned</option>
+              {team?.map((m) => (
+                <option key={m.id} value={m.id}>{m.name || m.email}{m.custom_role_name ? ` (${m.custom_role_name})` : ""}</option>
+              ))}
+            </select>
+          </div>
 
           {/* Conversation meta */}
           <div className="mt-6 pt-4 border-t space-y-2">

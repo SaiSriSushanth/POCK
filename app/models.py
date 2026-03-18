@@ -32,6 +32,17 @@ class TeamMember(Base):
     name = Column(Text)
     hashed_password = Column(Text, nullable=False)
     role = Column(String, default="agent")  # 'admin' | 'agent' | 'viewer'
+    custom_role_id = Column(UUID(as_uuid=True), ForeignKey("custom_roles.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CustomRole(Base):
+    __tablename__ = "custom_roles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    business_id = Column(UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -120,4 +131,17 @@ class Classification(Base):
     reasoning = Column(Text)
     draft_reply = Column(Text)
     model_version = Column(String, default="gpt-4o-mini")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AutomationRule(Base):
+    __tablename__ = "automation_rules"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    business_id = Column(UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False)
+    name = Column(String, nullable=False)
+    trigger_label = Column(String, nullable=False)   # label name that triggers this rule
+    action_type = Column(String, nullable=False)      # 'assign_to_role' | 'set_priority' | 'set_status' | 'auto_reply'
+    action_value = Column(Text, nullable=False)       # role_id | 'high'/'medium'/'low' | 'open'/'pending'/'resolved' | reply text
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

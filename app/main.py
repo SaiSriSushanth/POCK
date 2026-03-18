@@ -11,6 +11,10 @@ from .api.conversations import router as conversations_router
 from .api.contacts import router as contacts_router
 from .api.labels import router as labels_router
 from .api.analytics import router as analytics_router
+from .api.team import router as team_router
+from .api.roles import router as roles_router
+from .api.automation import router as automation_router
+from .api.search import router as search_router
 from .models import Label
 from .core.llm_service import get_embedding
 from sqlalchemy import text
@@ -45,6 +49,10 @@ app.include_router(conversations_router)
 app.include_router(contacts_router)
 app.include_router(labels_router)
 app.include_router(analytics_router)
+app.include_router(team_router)
+app.include_router(roles_router)
+app.include_router(automation_router)
+app.include_router(search_router)
 
 
 @app.on_event("startup")

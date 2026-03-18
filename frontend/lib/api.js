@@ -159,3 +159,63 @@ export async function getAnalyticsChannels() {
   const res = await api.get("/analytics/channels");
   return res.data;
 }
+
+// ── Team ──────────────────────────────────────────────────────────────────────
+
+export async function getTeam() {
+  const res = await api.get("/team");
+  return res.data;
+}
+
+export async function inviteMember(data) {
+  const res = await api.post("/team/invite", data);
+  return res.data;
+}
+
+export async function removeMember(id) {
+  await api.delete(`/team/${id}`);
+}
+
+// ── Roles ─────────────────────────────────────────────────────────────────────
+
+export async function getRoles() {
+  const res = await api.get("/roles");
+  return res.data;
+}
+
+export async function createRole(data) {
+  const res = await api.post("/roles", data);
+  return res.data;
+}
+
+export async function deleteRole(id) {
+  await api.delete(`/roles/${id}`);
+}
+
+// ── Automation ────────────────────────────────────────────────────────────────
+
+export async function getAutomationRules() {
+  const res = await api.get("/automation");
+  return res.data;
+}
+
+export async function createAutomationRule(data) {
+  const res = await api.post("/automation", data);
+  return res.data;
+}
+
+export async function updateAutomationRule(id, data) {
+  const res = await api.patch(`/automation/${id}`, data);
+  return res.data;
+}
+
+export async function deleteAutomationRule(id) {
+  await api.delete(`/automation/${id}`);
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+
+export async function searchMessages(q) {
+  const res = await api.get("/search", { params: { q } });
+  return res.data;
+}

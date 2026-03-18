@@ -2,7 +2,7 @@ from .celery_app import celery_app
 from ..database import SessionLocal
 from ..core.classification_engine import process_normalized_message
 from ..utils.normalization import NormalizedMessage
-from ..models import Contact, ContactChannel, Conversation, Message, Classification
+from ..models import Contact, ContactChannel, Conversation, Message, Classification, AutomationRule, CustomRole, TeamMember
 from ..services.reply_service import generate_draft_reply
 from typing import Optional
 from uuid import UUID
@@ -120,7 +120,43 @@ def classify_message_task(self, source: str, sender_id: str, text: str, business
             db.rollback()
             draft_failed = True
 
-        # ── 5. Update conversation timestamp ───────────────────────────────
+        # ── 5. Run automation rules ─────────────────────────────────────────
+        try:
+            rules = (
+                db.query(AutomationRule)
+                .filter(
+                    AutomationRule.business_id == biz_id,
+                    AutomationRule.is_active == True,
+                    AutomationRule.trigger_label == classification.predicted_label,
+                )
+                .all()
+            )
+            for rule in rules:
+                if rule.action_type == "assign_to_role":
+                    # Find a team member with this custom role (pick first available)
+                    from uuid import UUID as _UUID
+                    assignee = (
+                        db.query(TeamMember)
+                        .filter(
+                            TeamMember.business_id == biz_id,
+                            TeamMember.custom_role_id == _UUID(rule.action_value),
+                        )
+                        .first()
+                    )
+                    if assignee:
+                        conversation.assigned_to = assignee.id
+                        db.commit()
+                elif rule.action_type == "set_priority":
+                    conversation.priority = rule.action_value
+                    db.commit()
+                elif rule.action_type == "set_status":
+                    conversation.status = rule.action_value
+                    db.commit()
+        except Exception as rule_err:
+            print(f"Warning: automation rule execution failed: {rule_err}")
+            db.rollback()
+
+        # ── 6. Update conversation timestamp ───────────────────────────────
         # Re-fetch conversation if session was rolled back
         if draft_failed:
             conversation = db.query(Conversation).filter(Conversation.id == conversation.id).first()

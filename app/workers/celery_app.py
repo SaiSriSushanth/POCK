@@ -1,5 +1,6 @@
 import os
 from celery import Celery
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,7 +11,7 @@ celery_app = Celery(
     "pock",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["app.workers.classification_task"],
+    include=["app.workers.classification_task", "app.workers.briefing_task"],
 )
 
 celery_app.conf.update(
@@ -20,3 +21,10 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
 )
+
+celery_app.conf.beat_schedule = {
+    "daily-briefing": {
+        "task": "send_daily_briefing",
+        "schedule": crontab(hour=8, minute=0),  # 8am daily
+    },
+}
