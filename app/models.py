@@ -100,6 +100,7 @@ class Message(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     business_id = Column(UUID(as_uuid=True), ForeignKey("businesses.id"))
+    conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id"))
     source = Column(String)
     sender_id = Column(String)
     message_text = Column(Text)
@@ -117,5 +118,6 @@ class Classification(Base):
     llm_confidence = Column(Float)
     final_confidence = Column(Float)
     reasoning = Column(Text)
+    draft_reply = Column(Text)
     model_version = Column(String, default="gpt-4o-mini")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

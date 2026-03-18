@@ -60,6 +60,7 @@ class WebhookChange(BaseModel):
     value: WebhookValue
 
 class WebhookEntry(BaseModel):
+    id: Optional[str] = None
     changes: List[WebhookChange]
 
 class WebhookPayload(BaseModel):

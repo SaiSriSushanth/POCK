@@ -22,16 +22,45 @@ const STATUS_COLORS = {
   resolved: "bg-gray-100 text-gray-500",
 };
 
+const LABEL_COLORS = [
+  "bg-purple-100 text-purple-700",
+  "bg-blue-100 text-blue-700",
+  "bg-pink-100 text-pink-700",
+  "bg-orange-100 text-orange-700",
+  "bg-teal-100 text-teal-700",
+];
+
+function getLabelColor(label) {
+  if (!label) return "bg-gray-100 text-gray-500";
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) hash = label.charCodeAt(i) + ((hash << 5) - hash);
+  return LABEL_COLORS[Math.abs(hash) % LABEL_COLORS.length];
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return null;
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
 export default function InboxPage() {
   const router = useRouter();
   const [filter, setFilter] = useState("open");
 
   const { data: me, isError: meError } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const { data: channels } = useQuery({ queryKey: ["channels"], queryFn: getChannelStatus });
-  const { data: conversations, isLoading } = useQuery({
+  const {
+    data: conversations,
+    isLoading,
+    error: convError,
+  } = useQuery({
     queryKey: ["conversations", filter],
     queryFn: () => getConversations({ status: filter }),
     enabled: !!me,
+    retry: false,
   });
 
   useEffect(() => {
@@ -83,6 +112,7 @@ export default function InboxPage() {
         {/* Sidebar */}
         <aside className="w-48 bg-white border-r min-h-screen p-4 flex flex-col justify-between">
           <nav className="space-y-1">
+            <p className="text-xs font-semibold text-gray-400 uppercase px-3 py-1 tracking-wide">Inbox</p>
             {["open", "pending", "resolved"].map((s) => (
               <button
                 key={s}
@@ -94,6 +124,22 @@ export default function InboxPage() {
                 {s}
               </button>
             ))}
+
+            <div className="pt-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase px-3 py-1 tracking-wide">Navigation</p>
+              <button
+                onClick={() => router.push("/contacts")}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition"
+              >
+                👤 Contacts
+              </button>
+              <button
+                onClick={() => router.push("/analytics")}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition"
+              >
+                📊 Analytics
+              </button>
+            </div>
           </nav>
           <button
             onClick={handleConnectFacebook}
@@ -110,7 +156,9 @@ export default function InboxPage() {
             <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-800">No channels connected</p>
-                <p className="text-xs text-blue-600 mt-0.5">Connect Facebook to receive WhatsApp, Messenger & Instagram messages.</p>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  Connect Facebook to receive WhatsApp, Messenger & Instagram messages.
+                </p>
               </div>
               <button
                 onClick={handleConnectFacebook}
@@ -127,7 +175,13 @@ export default function InboxPage() {
 
           {isLoading && <p className="text-gray-400 text-sm">Loading...</p>}
 
-          {!isLoading && (!conversations || conversations.length === 0) && (
+          {convError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-red-700">Failed to load conversations. Is the API running?</p>
+            </div>
+          )}
+
+          {!isLoading && !convError && (!conversations || conversations.length === 0) && (
             <div className="text-center py-20 text-gray-400">
               <p className="text-3xl mb-2">📭</p>
               <p className="text-sm">No {filter} conversations</p>
@@ -138,32 +192,49 @@ export default function InboxPage() {
             {conversations?.map((conv) => (
               <div
                 key={conv.id}
-                className="bg-white rounded-lg border p-4 hover:shadow-sm transition cursor-pointer"
+                onClick={() => router.push(`/conversation/${conv.id}`)}
+                className="bg-white rounded-lg border p-4 hover:shadow-sm hover:border-blue-200 transition cursor-pointer"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{CHANNEL_ICONS[conv.source] || "💬"}</span>
+                    <span className="text-lg" title={conv.source}>
+                      {CHANNEL_ICONS[conv.source] || "💬"}
+                    </span>
                     <div>
                       <p className="font-medium text-gray-900 text-sm">
-                        {conv.contact?.display_name || conv.contact_id || "Unknown"}
+                        {conv.contact?.display_name || "Unknown"}
                       </p>
-                      <p className="text-xs text-gray-400">{conv.source}</p>
+                      <p className="text-xs text-gray-400 capitalize">{conv.source || "unknown channel"}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {conv.latest_label && (
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${getLabelColor(conv.latest_label)}`}
+                        title="AI Classification"
+                      >
+                        {conv.latest_label}
+                      </span>
+                    )}
                     {conv.priority && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLORS[conv.priority] || ""}`}>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLORS[conv.priority] || ""}`}
+                      >
                         {conv.priority}
                       </span>
                     )}
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[conv.status] || ""}`}>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[conv.status] || ""}`}
+                    >
                       {conv.status}
                     </span>
                   </div>
                 </div>
+
                 {conv.last_message_at && (
                   <p className="text-xs text-gray-400 mt-2">
-                    Last message: {new Date(conv.last_message_at).toLocaleString()}
+                    {timeAgo(conv.last_message_at)}
                   </p>
                 )}
               </div>

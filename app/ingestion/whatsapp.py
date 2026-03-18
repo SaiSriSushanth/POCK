@@ -36,7 +36,7 @@ async def handle_whatsapp(payload: WebhookPayload, db: Session = Depends(get_db)
 
             for change in entry.get("changes", []):
                 value = change.get("value", {})
-                if "messages" in value:
+                if value.get("messages"):
                     for message in value["messages"]:
                         if message.get("type") == "text":
                             classify_message_task.delay(

@@ -7,16 +7,22 @@ from typing import Optional
 from uuid import UUID
 
 
-def process_normalized_message(db: Session, msg: NormalizedMessage, business_id: Optional[UUID] = None):
+def process_normalized_message(
+    db: Session,
+    msg: NormalizedMessage,
+    business_id: Optional[UUID] = None,
+    conversation_id: Optional[UUID] = None,
+):
     # Resolve business_id — prefer explicit arg, fall back to msg field
     biz_id = business_id or msg.business_id
 
     # 1. Store Message
     db_message = Message(
         business_id=biz_id,
+        conversation_id=conversation_id,
         source=msg.source,
         sender_id=msg.sender_id,
-        message_text=msg.text
+        message_text=msg.text,
     )
     db.add(db_message)
     db.commit()
@@ -52,7 +58,7 @@ def process_normalized_message(db: Session, msg: NormalizedMessage, business_id:
         embedding_score=embedding_score,
         llm_confidence=llm_confidence,
         final_confidence=final_confidence,
-        reasoning=llm_result.get("reason", "")
+        reasoning=llm_result.get("reason", ""),
     )
     db.add(classification)
     db.commit()

@@ -75,6 +75,20 @@ async def get_connected_accounts(long_lived_token: str) -> dict:
         return {"pages": pages_data, "waba_accounts": waba_data}
 
 
+async def get_whatsapp_phone_number_id(waba_id: str, token: str) -> str | None:
+    """Fetch the first phone number ID registered under a WABA."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{GRAPH_API_BASE}/{waba_id}/phone_numbers",
+            params={"access_token": token, "fields": "id,display_phone_number"},
+        )
+        if resp.status_code == 200:
+            data = resp.json().get("data", [])
+            if data:
+                return data[0]["id"]
+    return None
+
+
 async def subscribe_webhooks(page_id: str, page_access_token: str) -> bool:
     """Subscribe our app to receive webhooks for a Facebook Page."""
     async with httpx.AsyncClient() as client:

@@ -7,6 +7,10 @@ from .ingestion.instagram import router as instagram_router
 from .ingestion.messenger import router as messenger_router
 from .api.auth import router as auth_router
 from .api.businesses import router as businesses_router
+from .api.conversations import router as conversations_router
+from .api.contacts import router as contacts_router
+from .api.labels import router as labels_router
+from .api.analytics import router as analytics_router
 from .models import Label
 from .core.llm_service import get_embedding
 from sqlalchemy import text
@@ -37,6 +41,10 @@ app.include_router(messenger_router)
 # Dashboard API
 app.include_router(auth_router)
 app.include_router(businesses_router)
+app.include_router(conversations_router)
+app.include_router(contacts_router)
+app.include_router(labels_router)
+app.include_router(analytics_router)
 
 
 @app.on_event("startup")
@@ -76,4 +84,4 @@ def seed_labels():
 
 @app.get("/")
 def root():
-    return {"message": "POCK API is running", "version": "mvp-phase-1"}
+    return {"message": "POCK API is running", "version": "mvp-phase-2"}

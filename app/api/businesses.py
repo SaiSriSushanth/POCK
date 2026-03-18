@@ -11,6 +11,7 @@ from ..services.oauth_service import (
     exchange_code_for_short_lived_token,
     exchange_for_long_lived_token,
     get_connected_accounts,
+    get_whatsapp_phone_number_id,
     subscribe_webhooks,
     META_APP_ID,
     META_REDIRECT_URI,
@@ -76,6 +77,9 @@ async def facebook_oauth_callback(
 
     if waba_accounts:
         business.whatsapp_waba_id = waba_accounts[0]["id"]
+        phone_number_id = await get_whatsapp_phone_number_id(waba_accounts[0]["id"], long_lived_token)
+        if phone_number_id:
+            business.whatsapp_phone_number = phone_number_id
 
     db.commit()
 
