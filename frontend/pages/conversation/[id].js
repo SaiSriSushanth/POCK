@@ -3,15 +3,17 @@ import { useRouter } from "next/router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getMe,
-  getConversations,
+  getConversation,
   getConversationMessages,
   updateConversation,
   sendReply,
   addNote,
   getNotes,
   getTeam,
+  updateContact,
   logout,
 } from "../../lib/api";
+import Layout from "../../components/Layout";
 
 const CHANNEL_ICONS = {
   whatsapp: "💬",
@@ -65,6 +67,10 @@ export default function ConversationPage() {
   const [replyText, setReplyText] = useState("");
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [sendError, setSendError] = useState(null);
+  const [editingContact, setEditingContact] = useState(false);
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
 
   // Auth guard
   const { isError: meError } = useQuery({ queryKey: ["me"], queryFn: getMe });
@@ -73,19 +79,20 @@ export default function ConversationPage() {
     router.push("/login");
   }
 
-  // Load conversation data from the list endpoint
-  const { data: conversations } = useQuery({
-    queryKey: ["conversations"],
-    queryFn: () => getConversations({}),
+  // Load single conversation
+  const { data: conversation } = useQuery({
+    queryKey: ["conversation", id],
+    queryFn: () => getConversation(id),
     enabled: !!id,
+    refetchInterval: 5000,
   });
-  const conversation = conversations?.find((c) => c.id === id) || null;
 
   // Load messages
   const { data: messages, isLoading: messagesLoading } = useQuery({
     queryKey: ["messages", id],
     queryFn: () => getConversationMessages(id),
     enabled: !!id,
+    refetchInterval: 3000,
     onSuccess: (data) => {
       if (!draftLoaded && data && data.length > 0) {
         const last = data[data.length - 1];
@@ -111,6 +118,7 @@ export default function ConversationPage() {
   const updateMutation = useMutation({
     mutationFn: (data) => updateConversation(id, data),
     onSuccess: () => {
+      queryClient.invalidateQueries(["conversation", id]);
       queryClient.invalidateQueries(["conversations"]);
     },
   });
@@ -130,10 +138,19 @@ export default function ConversationPage() {
       setDraftLoaded(false);
       setSendError(null);
       queryClient.invalidateQueries(["messages", id]);
+      queryClient.invalidateQueries(["conversation", id]);
       queryClient.invalidateQueries(["conversations"]);
     },
     onError: (err) => {
       setSendError(err?.response?.data?.detail || "Failed to send message");
+    },
+  });
+
+  const updateContactMutation = useMutation({
+    mutationFn: (data) => updateContact(contact.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["conversations"]);
+      setEditingContact(false);
     },
   });
 
@@ -142,55 +159,46 @@ export default function ConversationPage() {
   const contact = conversation?.contact;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-indigo-700 px-6 py-3 flex items-center justify-between shrink-0 shadow-md">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/inbox")}
-            className="text-sm text-indigo-200 hover:text-white transition"
-          >
-            ← Back
-          </button>
-          <span className="text-lg font-semibold text-white">
-            {contact?.display_name || "Conversation"}
-          </span>
-          {conversation?.source && (
-            <span className="text-xs text-indigo-300 capitalize">{conversation.source}</span>
-          )}
-        </div>
-
-        {/* Status controls */}
-        <div className="flex items-center gap-2">
-          {["open", "pending", "resolved"].map((s) => (
-            <button
-              key={s}
-              onClick={() => updateMutation.mutate({ status: s })}
-              className={`text-xs px-3 py-1.5 rounded-lg border capitalize transition font-medium ${
-                conversation?.status === s
-                  ? STATUS_COLORS[s]
-                  : "border-gray-200 text-gray-500 hover:bg-gray-50"
-              }`}
+    <Layout>
+      <div className="flex flex-col h-full overflow-hidden">
+        {/* Conversation top bar */}
+        <div className="bg-white border-b px-5 py-2.5 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-900 text-sm">
+              {contact?.display_name || "Conversation"}
+            </span>
+            {conversation?.source && (
+              <span className="text-xs text-gray-400 capitalize">{conversation.source}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {["open", "pending", "resolved"].map((s) => (
+              <button
+                key={s}
+                onClick={() => updateMutation.mutate({ status: s })}
+                className={`text-xs px-3 py-1.5 rounded-lg border capitalize transition font-medium ${
+                  conversation?.status === s
+                    ? STATUS_COLORS[s]
+                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+            <select
+              value={conversation?.priority || ""}
+              onChange={(e) => updateMutation.mutate({ priority: e.target.value || null })}
+              className="text-xs border rounded-lg px-2 py-1.5 text-gray-600 bg-white"
             >
-              {s}
-            </button>
-          ))}
-
-          {/* Priority */}
-          <select
-            value={conversation?.priority || ""}
-            onChange={(e) => updateMutation.mutate({ priority: e.target.value || null })}
-            className="text-xs border rounded-lg px-2 py-1.5 text-gray-600 bg-white"
-          >
-            <option value="">No Priority</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
+              <option value="">No Priority</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
         </div>
-      </header>
 
-      <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden">
         {/* Left: Message Thread */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Messages */}
@@ -327,11 +335,79 @@ export default function ConversationPage() {
 
           {contact ? (
             <div className="space-y-3">
-              <div>
-                <p className="font-semibold text-gray-900">{contact.display_name}</p>
-                {contact.email && <p className="text-xs text-gray-500">{contact.email}</p>}
-                {contact.phone && <p className="text-xs text-gray-500">{contact.phone}</p>}
-              </div>
+              {editingContact ? (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-0.5">Name</label>
+                    <input
+                      type="text"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      className="w-full text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-0.5">Email</label>
+                    <input
+                      type="email"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                      className="w-full text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-0.5">Phone</label>
+                    <input
+                      type="text"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      className="w-full text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() =>
+                        updateContactMutation.mutate({
+                          display_name: contactName || undefined,
+                          email: contactEmail || undefined,
+                          phone: contactPhone || undefined,
+                        })
+                      }
+                      disabled={updateContactMutation.isLoading}
+                      className="flex-1 text-xs bg-indigo-600 text-white rounded-lg py-1.5 hover:bg-indigo-700 disabled:opacity-40 transition"
+                    >
+                      {updateContactMutation.isLoading ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => setEditingContact(false)}
+                      className="flex-1 text-xs border border-gray-200 text-gray-500 rounded-lg py-1.5 hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-900">{contact.display_name}</p>
+                      {contact.email && <p className="text-xs text-gray-500">{contact.email}</p>}
+                      {contact.phone && <p className="text-xs text-gray-500">{contact.phone}</p>}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setContactName(contact.display_name || "");
+                        setContactEmail(contact.email || "");
+                        setContactPhone(contact.phone || "");
+                        setEditingContact(true);
+                      }}
+                      className="text-xs text-indigo-500 hover:text-indigo-700 transition shrink-0 ml-2"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Channel badge */}
               <div>
@@ -417,7 +493,8 @@ export default function ConversationPage() {
             )}
           </div>
         </aside>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

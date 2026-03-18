@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getMe, getAutomationRules, createAutomationRule, updateAutomationRule, deleteAutomationRule, getLabels, getRoles, logout } from "../lib/api";
+import Layout from "../components/Layout";
 
 const ACTION_TYPES = [
   { value: "assign_to_role", label: "Assign to role" },
@@ -53,15 +54,7 @@ export default function AutomationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-indigo-700 px-6 py-3 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/inbox")} className="text-sm text-indigo-200 hover:text-white transition">← Inbox</button>
-          <span className="font-bold text-xl text-white tracking-tight">Automation</span>
-        </div>
-        <span className="text-sm text-indigo-200">{me?.email}</span>
-      </header>
-
+    <Layout>
       <div className="max-w-3xl mx-auto p-6 space-y-6">
         {/* Create rule */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -191,6 +184,6 @@ export default function AutomationPage() {
           )}
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

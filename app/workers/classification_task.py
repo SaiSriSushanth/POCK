@@ -1,3 +1,4 @@
+import logging
 from .celery_app import celery_app
 from ..database import SessionLocal
 from ..core.classification_engine import process_normalized_message
@@ -7,6 +8,9 @@ from ..services.reply_service import generate_draft_reply
 from typing import Optional
 from uuid import UUID
 from sqlalchemy.sql import func
+from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(name="classify_message", bind=True, max_retries=3)
@@ -24,7 +28,7 @@ def classify_message_task(self, source: str, sender_id: str, text: str, business
         biz_id = UUID(business_id) if business_id else None
 
         if not biz_id:
-            print(f"Warning: no business_id for {source} message from {sender_id}, skipping")
+            logger.info(f"No business_id for {source} message from {sender_id}, skipping")
             return
 
         # ── 1. Resolve Contact ──────────────────────────────────────────────
@@ -87,6 +91,16 @@ def classify_message_task(self, source: str, sender_id: str, text: str, business
             db, msg, business_id=biz_id, conversation_id=conversation.id
         )
 
+        # ── 3b. Store message embedding for semantic search ─────────────────
+        try:
+            from ..core.llm_service import get_embedding
+            db_msg = db.query(Message).filter(Message.id == classification.message_id).first()
+            if db_msg:
+                db_msg.embedding = get_embedding(text)
+                db.commit()
+        except Exception as embed_err:
+            logger.warning(f"Warning: failed to store message embedding: {embed_err}")
+
         # ── 4. Generate draft reply ─────────────────────────────────────────
         # Fetch last 5 messages in this conversation for context
         prior_messages = (
@@ -116,7 +130,7 @@ def classify_message_task(self, source: str, sender_id: str, text: str, business
             db.commit()
         except Exception as draft_err:
             # Draft generation failure is non-fatal
-            print(f"Warning: draft reply generation failed: {draft_err}")
+            logger.warning(f"Warning: draft reply generation failed: {draft_err}")
             db.rollback()
             draft_failed = True
 
@@ -153,7 +167,29 @@ def classify_message_task(self, source: str, sender_id: str, text: str, business
                     conversation.status = rule.action_value
                     db.commit()
         except Exception as rule_err:
-            print(f"Warning: automation rule execution failed: {rule_err}")
+            logger.warning(f"Warning: automation rule execution failed: {rule_err}")
+            db.rollback()
+
+        # ── Priority scoring ────────────────────────────────────────────────
+        # Only auto-assign if no rule already set it
+        try:
+            if not conversation.priority:
+                label = classification.predicted_label or ""
+                hours_open = 0
+                if conversation.created_at:
+                    hours_open = (datetime.now(timezone.utc) - conversation.created_at).total_seconds() / 3600
+
+                if "Hot Lead" in label:
+                    conversation.priority = "high"
+                elif "Refund" in label or "Support" in label:
+                    conversation.priority = "medium" if hours_open < 4 else "high"
+                elif "Spam" in label or "Needs Review" in label:
+                    conversation.priority = "low"
+                else:
+                    conversation.priority = "medium"
+                db.commit()
+        except Exception as priority_err:
+            logger.warning(f"Warning: priority scoring failed: {priority_err}")
             db.rollback()
 
         # ── 6. Update conversation timestamp ───────────────────────────────

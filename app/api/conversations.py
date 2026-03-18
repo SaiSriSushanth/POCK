@@ -32,7 +32,13 @@ class ReplyCreate(BaseModel):
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
-def _serialize_conversation(conv: Conversation, contact: Optional[Contact], label: Optional[str]):
+def _serialize_conversation(
+    conv: Conversation,
+    contact: Optional[Contact],
+    label: Optional[str],
+    last_message_text: Optional[str] = None,
+    assigned_to_name: Optional[str] = None,
+):
     return {
         "id": str(conv.id),
         "business_id": str(conv.business_id),
@@ -50,6 +56,8 @@ def _serialize_conversation(conv: Conversation, contact: Optional[Contact], labe
             "tags": contact.tags or [],
         } if contact else None,
         "latest_label": label,
+        "last_message_text": last_message_text,
+        "assigned_to_name": assigned_to_name,
     }
 
 
@@ -98,7 +106,15 @@ def list_conversations(
         if label and latest_label != label:
             continue
 
-        results.append(_serialize_conversation(conv, contact, latest_label))
+        last_message_text = latest_msg.message_text if latest_msg else None
+
+        assigned_to_name = None
+        if conv.assigned_to:
+            assignee = db.query(TeamMember).filter(TeamMember.id == conv.assigned_to).first()
+            if assignee:
+                assigned_to_name = assignee.name or assignee.email
+
+        results.append(_serialize_conversation(conv, contact, latest_label, last_message_text, assigned_to_name))
 
     return results
 
@@ -129,6 +145,46 @@ def update_conversation(
 
     contact = db.query(Contact).filter(Contact.id == conv.contact_id).first() if conv.contact_id else None
     return _serialize_conversation(conv, contact, None)
+
+
+@router.get("/{conversation_id}")
+def get_conversation(
+    conversation_id: UUID,
+    db: Session = Depends(get_db),
+    current_member: TeamMember = Depends(get_current_member),
+):
+    conv = db.query(Conversation).filter(
+        Conversation.id == conversation_id,
+        Conversation.business_id == current_member.business_id,
+    ).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    contact = db.query(Contact).filter(Contact.id == conv.contact_id).first() if conv.contact_id else None
+
+    latest_msg = (
+        db.query(Message)
+        .filter(Message.conversation_id == conv.id)
+        .order_by(Message.created_at.desc())
+        .first()
+    )
+    latest_label = None
+    if latest_msg:
+        clf = db.query(Classification).filter(Classification.message_id == latest_msg.id).first()
+        if clf:
+            latest_label = clf.predicted_label
+
+    assigned_to_name = None
+    if conv.assigned_to:
+        assignee = db.query(TeamMember).filter(TeamMember.id == conv.assigned_to).first()
+        if assignee:
+            assigned_to_name = assignee.name or assignee.email
+
+    return _serialize_conversation(
+        conv, contact, latest_label,
+        latest_msg.message_text if latest_msg else None,
+        assigned_to_name,
+    )
 
 
 @router.get("/{conversation_id}/messages")

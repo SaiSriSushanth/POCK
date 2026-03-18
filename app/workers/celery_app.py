@@ -11,7 +11,11 @@ celery_app = Celery(
     "pock",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["app.workers.classification_task", "app.workers.briefing_task"],
+    include=[
+        "app.workers.classification_task",
+        "app.workers.briefing_task",
+        "app.workers.token_refresh_task",
+    ],
 )
 
 celery_app.conf.update(
@@ -26,5 +30,9 @@ celery_app.conf.beat_schedule = {
     "daily-briefing": {
         "task": "send_daily_briefing",
         "schedule": crontab(hour=8, minute=0),  # 8am daily
+    },
+    "refresh-meta-tokens": {
+        "task": "refresh_meta_tokens",
+        "schedule": crontab(hour=9, minute=0),  # 9am daily
     },
 }

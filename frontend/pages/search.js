@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import { useQuery } from "@tanstack/react-query";
 import { getMe, searchMessages, logout } from "../lib/api";
+import Layout from "../components/Layout";
 
 function timeAgo(dateStr) {
   if (!dateStr) return "";
@@ -32,15 +33,7 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-indigo-700 px-6 py-3 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/inbox")} className="text-sm text-indigo-200 hover:text-white transition">← Inbox</button>
-          <span className="font-bold text-xl text-white tracking-tight">Search</span>
-        </div>
-        <span className="text-sm text-indigo-200">{me?.email}</span>
-      </header>
-
+    <Layout>
       <div className="max-w-2xl mx-auto p-6">
         <form onSubmit={handleSearch} className="flex gap-2 mb-6">
           <input
@@ -87,6 +80,6 @@ export default function SearchPage() {
           ))}
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

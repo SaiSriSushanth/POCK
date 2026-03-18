@@ -1,5 +1,12 @@
-from fastapi import FastAPI
+import os
+import logging
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
 from .database import engine, Base, SessionLocal
 from .ingestion.whatsapp import router as whatsapp_router
 from .ingestion.slack import router as slack_router
@@ -17,16 +24,39 @@ from .api.automation import router as automation_router
 from .api.search import router as search_router
 from .models import Label
 from .core.llm_service import get_embedding
-from sqlalchemy import text
 
-# Create tables and enable pgvector extension
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# ── Sentry (optional — only active when SENTRY_DSN is set) ──────────────────
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+        traces_sample_rate=0.2,
+    )
+    logger.info("Sentry initialized")
+
+# ── pgvector + tables ────────────────────────────────────────────────────────
 with engine.connect() as conn:
     conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     conn.commit()
 
 Base.metadata.create_all(bind=engine)
 
+# ── Rate limiter ─────────────────────────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="POCK — Multi-Channel AI Message Intelligence")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,39 +87,48 @@ app.include_router(search_router)
 
 @app.on_event("startup")
 def seed_labels():
-    """Seed global default labels (business_id=None) if they don't exist."""
     db = SessionLocal()
     try:
         labels_to_seed = [
             {"name": "Hot Lead", "description": "Customer asking about pricing, purchase, or product details."},
             {"name": "Support", "description": "Technical issue, login help, or general assistance request."},
             {"name": "Refund", "description": "Customer requesting a refund, cancellation, or money back."},
-            {"name": "Spam", "description": "Irrelevant content, promotional messages, or junk."}
+            {"name": "Spam", "description": "Irrelevant content, promotional messages, or junk."},
         ]
-
         for label_data in labels_to_seed:
             existing = db.query(Label).filter(
                 Label.name == label_data["name"],
-                Label.business_id.is_(None)
+                Label.business_id.is_(None),
             ).first()
             if not existing:
-                print(f"Seeding global label: {label_data['name']}...")
+                logger.info(f"Seeding global label: {label_data['name']}")
                 embedding = get_embedding(f"{label_data['name']}: {label_data['description']}")
-                db_label = Label(
+                db.add(Label(
                     name=label_data["name"],
                     description=label_data["description"],
                     embedding=embedding,
                     business_id=None,
-                )
-                db.add(db_label)
-
+                ))
         db.commit()
     except Exception as e:
-        print(f"Error seeding labels: {e}")
+        logger.error(f"Error seeding labels: {e}")
+    finally:
+        db.close()
+
+
+@app.get("/health")
+def health_check():
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "healthy", "database": "ok"}
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "database": str(e)})
     finally:
         db.close()
 
 
 @app.get("/")
 def root():
-    return {"message": "POCK API is running", "version": "mvp-phase-2"}
+    return {"message": "POCK API is running", "version": "mvp-phase-3"}

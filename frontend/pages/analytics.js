@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import { useQuery } from "@tanstack/react-query";
+import Layout from "../components/Layout";
 import {
   getMe,
   getAnalyticsOverview,
@@ -86,26 +87,7 @@ export default function AnalyticsPage() {
     : 1;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/inbox")}
-            className="text-sm text-gray-500 hover:text-gray-900 transition"
-          >
-            ← Inbox
-          </button>
-          <span className="font-bold text-lg text-gray-900">Analytics</span>
-        </div>
-        <button
-          onClick={() => router.push("/contacts")}
-          className="text-sm text-gray-500 hover:text-gray-900 transition"
-        >
-          👤 Contacts
-        </button>
-      </header>
-
+    <Layout>
       <main className="max-w-5xl mx-auto p-6 space-y-8">
 
         {/* Overview Cards */}
@@ -223,6 +205,6 @@ export default function AnalyticsPage() {
           </div>
         </div>
       </main>
-    </div>
+    </Layout>
   );
 }

@@ -115,6 +115,7 @@ class Message(Base):
     source = Column(String)
     sender_id = Column(String)
     message_text = Column(Text)
+    embedding = Column(Vector(1536), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

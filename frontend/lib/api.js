@@ -69,10 +69,8 @@ export async function getConversations(params = {}) {
 }
 
 export async function getConversation(id) {
-  // The list endpoint returns all conversations; fetch detail via messages
-  // We get the conversation from the list to avoid a separate detail endpoint
-  const res = await api.get("/conversations", { params: {} });
-  return res.data.find((c) => c.id === id) || null;
+  const res = await api.get(`/conversations/${id}`);
+  return res.data;
 }
 
 export async function getConversationMessages(id) {

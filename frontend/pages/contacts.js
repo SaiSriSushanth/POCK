@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getMe, getContacts, getContactHistory, updateContact, logout } from "../lib/api";
+import Layout from "../components/Layout";
 
 const CHANNEL_ICONS = {
   whatsapp: "💬",
@@ -239,26 +240,7 @@ export default function ContactsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/inbox")}
-            className="text-sm text-gray-500 hover:text-gray-900 transition"
-          >
-            ← Inbox
-          </button>
-          <span className="font-bold text-lg text-gray-900">Contacts</span>
-        </div>
-        <button
-          onClick={() => router.push("/analytics")}
-          className="text-sm text-gray-500 hover:text-gray-900 transition"
-        >
-          📊 Analytics
-        </button>
-      </header>
-
+    <Layout>
       <main className="max-w-4xl mx-auto p-6">
         {/* Search */}
         <div className="mb-6">
@@ -336,6 +318,6 @@ export default function ContactsPage() {
       {selectedContact && (
         <ContactDetail contact={selectedContact} onClose={() => setSelectedContact(null)} />
       )}
-    </div>
+    </Layout>
   );
 }

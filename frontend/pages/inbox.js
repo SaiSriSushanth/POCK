@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { useQuery } from "@tanstack/react-query";
-import { getMe, getConversations, getChannelStatus, getFacebookOAuthUrl, logout } from "../lib/api";
+import { getMe, getConversations, logout } from "../lib/api";
+import Layout from "../components/Layout";
 
 const CHANNEL_ICONS = {
   whatsapp: "💬",
@@ -51,7 +52,6 @@ export default function InboxPage() {
   const [filter, setFilter] = useState("open");
 
   const { data: me, isError: meError } = useQuery({ queryKey: ["me"], queryFn: getMe });
-  const { data: channels } = useQuery({ queryKey: ["channels"], queryFn: getChannelStatus });
   const {
     data: conversations,
     isLoading,
@@ -61,7 +61,14 @@ export default function InboxPage() {
     queryFn: () => getConversations({ status: filter }),
     enabled: !!me,
     retry: false,
+    refetchInterval: 10000,
   });
+
+  const { data: openConvs } = useQuery({ queryKey: ["conversations", "open"], queryFn: () => getConversations({ status: "open" }), enabled: !!me, refetchInterval: 10000 });
+  const { data: pendingConvs } = useQuery({ queryKey: ["conversations", "pending"], queryFn: () => getConversations({ status: "pending" }), enabled: !!me, refetchInterval: 10000 });
+  const { data: resolvedConvs } = useQuery({ queryKey: ["conversations", "resolved"], queryFn: () => getConversations({ status: "resolved" }), enabled: !!me, refetchInterval: 10000 });
+
+  const counts = { open: openConvs?.length ?? 0, pending: pendingConvs?.length ?? 0, resolved: resolvedConvs?.length ?? 0 };
 
   useEffect(() => {
     if (meError) {
@@ -70,112 +77,30 @@ export default function InboxPage() {
     }
   }, [meError]);
 
-  const handleLogout = () => {
-    logout();
-    router.push("/login");
-  };
-
-  const handleConnectFacebook = async () => {
-    const url = await getFacebookOAuthUrl();
-    window.location.href = url;
-  };
-
-  const noChannelsConnected = channels && Object.values(channels).every((v) => !v);
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-indigo-700 px-6 py-3 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-3">
-          <span className="font-bold text-xl text-white tracking-tight">POCK</span>
+    <Layout>
+      <div className="flex h-full">
+        {/* Filter sidebar */}
+        <div className="w-36 bg-indigo-900 min-h-screen p-3 shrink-0">
+          <p className="text-xs font-semibold text-indigo-300 uppercase px-2 py-1 tracking-wide mb-1">Filter</p>
+          {["open", "pending", "resolved"].map((s) => (
+            <button
+              key={s}
+              onClick={() => setFilter(s)}
+              className={`w-full text-left px-2 py-2 rounded-lg text-sm capitalize transition flex items-center justify-between ${
+                filter === s ? "bg-white text-indigo-700 font-semibold" : "text-indigo-200 hover:bg-indigo-700"
+              }`}
+            >
+              <span>{s}</span>
+              <span className={`text-xs px-1.5 rounded-full font-semibold ${filter === s ? "bg-indigo-100 text-indigo-700" : "bg-indigo-700 text-indigo-200"}`}>
+                {counts[s]}
+              </span>
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-indigo-200">{me?.email}</span>
-          <button onClick={handleLogout} className="text-sm text-indigo-100 hover:text-white transition">
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-48 bg-indigo-800 min-h-screen p-4 flex flex-col justify-between">
-          <nav className="space-y-1">
-            <p className="text-xs font-semibold text-indigo-300 uppercase px-3 py-1 tracking-wide">Inbox</p>
-            {["open", "pending", "resolved"].map((s) => (
-              <button
-                key={s}
-                onClick={() => setFilter(s)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm capitalize transition ${
-                  filter === s ? "bg-white text-indigo-700 font-semibold" : "text-indigo-200 hover:bg-indigo-700"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-
-            <div className="pt-4">
-              <p className="text-xs font-semibold text-indigo-300 uppercase px-3 py-1 tracking-wide">Navigation</p>
-              <button
-                onClick={() => router.push("/contacts")}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
-              >
-                Contacts
-              </button>
-              <button
-                onClick={() => router.push("/analytics")}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
-              >
-                Analytics
-              </button>
-              <button
-                onClick={() => router.push("/search")}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
-              >
-                Search
-              </button>
-              <button
-                onClick={() => router.push("/settings")}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
-              >
-                Settings
-              </button>
-              <button
-                onClick={() => router.push("/automation")}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
-              >
-                Automation
-              </button>
-            </div>
-          </nav>
-          <button
-            onClick={handleConnectFacebook}
-            className="w-full text-left px-3 py-2 rounded-lg text-xs text-indigo-400 hover:bg-indigo-700 transition"
-          >
-            Reconnect Facebook
-          </button>
-        </aside>
 
         {/* Conversation List */}
         <main className="flex-1 p-6">
-          {/* No channels banner */}
-          {noChannelsConnected && (
-            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-800">No channels connected</p>
-                <p className="text-xs text-blue-600 mt-0.5">
-                  Connect Facebook to receive WhatsApp, Messenger & Instagram messages.
-                </p>
-              </div>
-              <button
-                onClick={handleConnectFacebook}
-                className="flex items-center gap-2 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
-              >
-                <span>📘</span> Connect Facebook
-              </button>
-            </div>
-          )}
-
           <h2 className="text-sm font-semibold text-gray-500 uppercase mb-4 tracking-wide">
             {filter} conversations
           </h2>
@@ -216,6 +141,11 @@ export default function InboxPage() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {conv.assigned_to_name && (
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                        {conv.assigned_to_name}
+                      </span>
+                    )}
                     {conv.latest_label && (
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full font-medium ${getLabelColor(conv.latest_label)}`}
@@ -239,8 +169,16 @@ export default function InboxPage() {
                   </div>
                 </div>
 
+                {conv.last_message_text && (
+                  <p className="text-xs text-gray-500 mt-1 truncate">
+                    {conv.last_message_text.length > 80
+                      ? conv.last_message_text.slice(0, 80) + "..."
+                      : conv.last_message_text}
+                  </p>
+                )}
+
                 {conv.last_message_at && (
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-gray-400 mt-1">
                     {timeAgo(conv.last_message_at)}
                   </p>
                 )}
@@ -249,6 +187,6 @@ export default function InboxPage() {
           </div>
         </main>
       </div>
-    </div>
+    </Layout>
   );
 }

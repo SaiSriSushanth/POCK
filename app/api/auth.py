@@ -1,15 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
-from uuid import UUID
+from pydantic import BaseModel
 
 from ..database import get_db
 from ..models import TeamMember, Business
 from ..utils.auth import hash_password, verify_password, create_access_token, decode_access_token
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["Auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+# Limiter instance — overwritten by main.py after app init
+limiter = Limiter(key_func=get_remote_address)
 
 
 # --- Request / Response schemas ---
@@ -18,7 +25,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: str
-    business_name: str  # creates a new Business on first register
+    business_name: str
 
 
 class TokenResponse(BaseModel):
@@ -41,15 +48,15 @@ def get_current_member(token: str = Depends(oauth2_scheme), db: Session = Depend
 # --- Endpoints ---
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(req: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/hour")
+def register(request: Request, req: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(TeamMember).filter(TeamMember.email == req.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Create a new Business for this registration
     business = Business(name=req.business_name)
     db.add(business)
-    db.flush()  # get business.id before committing
+    db.flush()
 
     member = TeamMember(
         business_id=business.id,
@@ -61,15 +68,18 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     db.add(member)
     db.commit()
     db.refresh(member)
+    logger.info(f"New business registered: {req.business_name} ({req.email})")
 
     token = create_access_token(team_member_id=member.id, business_id=business.id)
     return TokenResponse(access_token=token)
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     member = db.query(TeamMember).filter(TeamMember.email == form.username).first()
     if not member or not verify_password(form.password, member.hashed_password):
+        logger.warning(f"Failed login attempt for {form.username}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
 
     token = create_access_token(team_member_id=member.id, business_id=member.business_id)
