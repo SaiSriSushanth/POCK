@@ -138,22 +138,21 @@ export default function ConversationPage() {
   const contact = conversation?.contact;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b px-6 py-3 flex items-center justify-between shrink-0">
+      <header className="bg-indigo-700 px-6 py-3 flex items-center justify-between shrink-0 shadow-md">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/inbox")}
-            className="text-sm text-gray-500 hover:text-gray-900 transition"
+            className="text-sm text-indigo-200 hover:text-white transition"
           >
             ← Back
           </button>
-          <span className="text-lg font-semibold text-gray-900">
-            {CHANNEL_ICONS[conversation?.source] || "💬"}{" "}
+          <span className="text-lg font-semibold text-white">
             {contact?.display_name || "Conversation"}
           </span>
           {conversation?.source && (
-            <span className="text-xs text-gray-400 capitalize">{conversation.source}</span>
+            <span className="text-xs text-indigo-300 capitalize">{conversation.source}</span>
           )}
         </div>
 
@@ -201,13 +200,15 @@ export default function ConversationPage() {
               </div>
             )}
 
-            {messages?.map((msg) => (
-              <div key={msg.id} className="space-y-1">
+            {messages?.map((msg) => {
+              const isAgent = msg.sender_id === "agent";
+              return (
+              <div key={msg.id} className={`flex ${isAgent ? "justify-end" : "justify-start"}`}>
                 {/* Message bubble */}
-                <div className="bg-white rounded-xl border p-4 max-w-2xl shadow-sm">
+                <div className={`rounded-xl p-4 max-w-2xl shadow-sm ${isAgent ? "bg-indigo-600 text-white" : "bg-white border border-slate-200"}`}>
                   <div className="flex items-start justify-between gap-4">
-                    <p className="text-sm text-gray-800 leading-relaxed">{msg.message_text}</p>
-                    <span className="text-xs text-gray-400 shrink-0">{timeAgo(msg.created_at)}</span>
+                    <p className={`text-sm leading-relaxed ${isAgent ? "text-white" : "text-gray-800"}`}>{msg.message_text}</p>
+                    <span className={`text-xs shrink-0 ${isAgent ? "text-indigo-200" : "text-gray-400"}`}>{timeAgo(msg.created_at)}</span>
                   </div>
 
                   {/* Classification badge */}
@@ -234,7 +235,8 @@ export default function ConversationPage() {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Reply input */}

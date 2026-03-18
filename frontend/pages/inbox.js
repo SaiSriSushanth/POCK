@@ -83,26 +83,15 @@ export default function InboxPage() {
   const noChannelsConnected = channels && Object.values(channels).every((v) => !v);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
+      <header className="bg-indigo-700 px-6 py-3 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
-          <span className="font-bold text-lg text-gray-900">POCK</span>
-          {channels && (
-            <div className="flex gap-1">
-              {Object.entries(channels).map(([ch, connected]) =>
-                connected ? (
-                  <span key={ch} className="text-sm" title={ch}>
-                    {CHANNEL_ICONS[ch]}
-                  </span>
-                ) : null
-              )}
-            </div>
-          )}
+          <span className="font-bold text-xl text-white tracking-tight">POCK</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">{me?.email}</span>
-          <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">
+          <span className="text-sm text-indigo-200">{me?.email}</span>
+          <button onClick={handleLogout} className="text-sm text-indigo-100 hover:text-white transition">
             Sign out
           </button>
         </div>
@@ -110,15 +99,15 @@ export default function InboxPage() {
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-48 bg-white border-r min-h-screen p-4 flex flex-col justify-between">
+        <aside className="w-48 bg-indigo-800 min-h-screen p-4 flex flex-col justify-between">
           <nav className="space-y-1">
-            <p className="text-xs font-semibold text-gray-400 uppercase px-3 py-1 tracking-wide">Inbox</p>
+            <p className="text-xs font-semibold text-indigo-300 uppercase px-3 py-1 tracking-wide">Inbox</p>
             {["open", "pending", "resolved"].map((s) => (
               <button
                 key={s}
                 onClick={() => setFilter(s)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm capitalize transition ${
-                  filter === s ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-600 hover:bg-gray-50"
+                  filter === s ? "bg-white text-indigo-700 font-semibold" : "text-indigo-200 hover:bg-indigo-700"
                 }`}
               >
                 {s}
@@ -126,26 +115,26 @@ export default function InboxPage() {
             ))}
 
             <div className="pt-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase px-3 py-1 tracking-wide">Navigation</p>
+              <p className="text-xs font-semibold text-indigo-300 uppercase px-3 py-1 tracking-wide">Navigation</p>
               <button
                 onClick={() => router.push("/contacts")}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition"
+                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
               >
-                👤 Contacts
+                Contacts
               </button>
               <button
                 onClick={() => router.push("/analytics")}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition"
+                className="w-full text-left px-3 py-2 rounded-lg text-sm text-indigo-200 hover:bg-indigo-700 transition"
               >
-                📊 Analytics
+                Analytics
               </button>
             </div>
           </nav>
           <button
             onClick={handleConnectFacebook}
-            className="w-full text-left px-3 py-2 rounded-lg text-xs text-gray-400 hover:bg-gray-50 transition"
+            className="w-full text-left px-3 py-2 rounded-lg text-xs text-indigo-400 hover:bg-indigo-700 transition"
           >
-            📘 Reconnect Facebook
+            Reconnect Facebook
           </button>
         </aside>
 
@@ -193,7 +182,7 @@ export default function InboxPage() {
               <div
                 key={conv.id}
                 onClick={() => router.push(`/conversation/${conv.id}`)}
-                className="bg-white rounded-lg border p-4 hover:shadow-sm hover:border-blue-200 transition cursor-pointer"
+                className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md hover:border-indigo-300 transition cursor-pointer"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
