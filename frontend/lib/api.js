@@ -51,3 +51,13 @@ export async function getChannelStatus() {
   const res = await api.get("/businesses/channels");
   return res.data;
 }
+
+export async function getFacebookOAuthUrl() {
+  const res = await api.get("/businesses/oauth/facebook/url");
+  return res.data.url;
+}
+
+export async function connectFacebook(code) {
+  const res = await api.get(`/businesses/oauth/facebook/callback?code=${code}`);
+  return res.data;
+}

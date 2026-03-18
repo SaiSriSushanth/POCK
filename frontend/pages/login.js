@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { login, register } from "../lib/api";
+import { login, register, getFacebookOAuthUrl } from "../lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
   const [isRegister, setIsRegister] = useState(false);
+  const [registered, setRegistered] = useState(false); // post-registration step
   const [form, setForm] = useState({ email: "", password: "", name: "", businessName: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,16 +19,61 @@ export default function LoginPage() {
     try {
       if (isRegister) {
         await register(form.email, form.password, form.name, form.businessName);
+        setRegistered(true); // show connect channels step
       } else {
         await login(form.email, form.password);
+        router.push("/inbox");
       }
-      router.push("/inbox");
     } catch (err) {
       setError(err.response?.data?.detail || "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
+
+  const connectFacebook = async () => {
+    setError("");
+    try {
+      const url = await getFacebookOAuthUrl();
+      window.location.href = url;
+    } catch {
+      setError("Could not get Facebook OAuth URL. Check that META_APP_ID is set.");
+    }
+  };
+
+  // Post-registration: connect channels
+  if (registered) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow p-8 w-full max-w-md">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">POCK</h1>
+          <p className="text-gray-500 mb-1 text-sm">Account created successfully!</p>
+          <p className="text-gray-500 mb-6 text-sm">Connect your channels to start receiving messages.</p>
+
+          <div className="space-y-3">
+            <button
+              onClick={connectFacebook}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 transition"
+            >
+              <span>📘</span> Connect with Facebook
+              <span className="text-xs opacity-75">(WhatsApp, Messenger, Instagram)</span>
+            </button>
+          </div>
+
+          {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
+
+          <div className="mt-6 border-t pt-4 text-center">
+            <button
+              onClick={() => router.push("/inbox")}
+              className="text-sm text-gray-400 hover:text-gray-600 hover:underline"
+            >
+              Skip for now, go to inbox
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -90,21 +136,12 @@ export default function LoginPage() {
 
         <div className="mt-4 text-center">
           <button
-            onClick={() => setIsRegister(!isRegister)}
+            onClick={() => { setIsRegister(!isRegister); setError(""); }}
             className="text-sm text-blue-600 hover:underline"
           >
             {isRegister ? "Already have an account? Sign in" : "New business? Create account"}
           </button>
         </div>
-
-        {isRegister && (
-          <div className="mt-6 border-t pt-4">
-            <p className="text-xs text-gray-500 mb-2">Connect your channels after registering:</p>
-            <button className="w-full flex items-center justify-center gap-2 border rounded-lg py-2 text-sm hover:bg-gray-50 transition">
-              <span>📘</span> Connect with Facebook
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

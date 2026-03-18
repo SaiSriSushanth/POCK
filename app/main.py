@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base, SessionLocal
 from .ingestion.whatsapp import router as whatsapp_router
 from .ingestion.slack import router as slack_router
@@ -18,6 +19,14 @@ with engine.connect() as conn:
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="POCK — Multi-Channel AI Message Intelligence")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Ingestion webhooks
 app.include_router(whatsapp_router)

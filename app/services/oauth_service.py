@@ -53,17 +53,24 @@ async def get_connected_accounts(long_lived_token: str) -> dict:
         pages_resp.raise_for_status()
         pages_data = pages_resp.json().get("data", [])
 
-        # Get WhatsApp Business Accounts
-        waba_resp = await client.get(
-            f"{GRAPH_API_BASE}/me/businesses",
-            params={"access_token": long_lived_token, "fields": "id,name,whatsapp_business_accounts"},
-        )
-        # WABA fetch may fail if not provisioned — treat as optional
+        # Get WhatsApp Business Accounts via owned_whatsapp_business_accounts
         waba_data = []
-        if waba_resp.status_code == 200:
-            for biz in waba_resp.json().get("data", []):
-                for waba in biz.get("whatsapp_business_accounts", {}).get("data", []):
-                    waba_data.append(waba)
+        try:
+            biz_resp = await client.get(
+                f"{GRAPH_API_BASE}/me/businesses",
+                params={"access_token": long_lived_token, "fields": "id,name"},
+            )
+            if biz_resp.status_code == 200:
+                for biz in biz_resp.json().get("data", []):
+                    waba_resp = await client.get(
+                        f"{GRAPH_API_BASE}/{biz['id']}/owned_whatsapp_business_accounts",
+                        params={"access_token": long_lived_token},
+                    )
+                    if waba_resp.status_code == 200:
+                        for waba in waba_resp.json().get("data", []):
+                            waba_data.append(waba)
+        except Exception:
+            pass
 
         return {"pages": pages_data, "waba_accounts": waba_data}
 

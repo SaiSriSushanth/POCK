@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { useQuery } from "@tanstack/react-query";
-import { getMe, getConversations, getChannelStatus, logout } from "../lib/api";
+import { getMe, getConversations, getChannelStatus, getFacebookOAuthUrl, logout } from "../lib/api";
 
 const CHANNEL_ICONS = {
   whatsapp: "💬",
@@ -46,6 +46,13 @@ export default function InboxPage() {
     router.push("/login");
   };
 
+  const handleConnectFacebook = async () => {
+    const url = await getFacebookOAuthUrl();
+    window.location.href = url;
+  };
+
+  const noChannelsConnected = channels && Object.values(channels).every((v) => !v);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -74,7 +81,7 @@ export default function InboxPage() {
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-48 bg-white border-r min-h-screen p-4">
+        <aside className="w-48 bg-white border-r min-h-screen p-4 flex flex-col justify-between">
           <nav className="space-y-1">
             {["open", "pending", "resolved"].map((s) => (
               <button
@@ -88,10 +95,32 @@ export default function InboxPage() {
               </button>
             ))}
           </nav>
+          <button
+            onClick={handleConnectFacebook}
+            className="w-full text-left px-3 py-2 rounded-lg text-xs text-gray-400 hover:bg-gray-50 transition"
+          >
+            📘 Reconnect Facebook
+          </button>
         </aside>
 
         {/* Conversation List */}
         <main className="flex-1 p-6">
+          {/* No channels banner */}
+          {noChannelsConnected && (
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-800">No channels connected</p>
+                <p className="text-xs text-blue-600 mt-0.5">Connect Facebook to receive WhatsApp, Messenger & Instagram messages.</p>
+              </div>
+              <button
+                onClick={handleConnectFacebook}
+                className="flex items-center gap-2 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
+              >
+                <span>📘</span> Connect Facebook
+              </button>
+            </div>
+          )}
+
           <h2 className="text-sm font-semibold text-gray-500 uppercase mb-4 tracking-wide">
             {filter} conversations
           </h2>
